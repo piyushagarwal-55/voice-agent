@@ -19,7 +19,7 @@ LiveKit (Cloud)  ─────────────────────
     │  media/session transport                                  │ room events
     ▼                                                            ▼
 apps/agent (LiveKit Agents worker)                          apps/api (Express)
-    │  Silero VAD → Deepgram STT → OpenRouter LLM → Deepgram TTS
+    │  Silero VAD → Sarvam STT → Groq LLM → Sarvam TTS
     │  CallOrchestrator (state machine) ─┬─ TriageAgent
     │                                    ├─ IntakeAgent      (structured extraction via OpenRouterService)
     │                                    ├─ QualificationAgent (deterministic rules, not LLM-decided)
@@ -63,23 +63,25 @@ standard VAD-based endpointing), and an architecture diagram image / recorded de
 
 ## Prerequisites
 
-You need three free-tier accounts (Postgres/Redis run locally via Docker, no account needed):
+You need six services/accounts. Supabase provides Postgres and a hosted Redis provider replaces the Redis
+container, so Docker is optional.
 
 | Service | Get it at | Env vars |
 |---|---|---|
 | LiveKit Cloud | https://cloud.livekit.io (free project) | `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` |
-| OpenRouter | https://openrouter.ai/keys | `OPENROUTER_API_KEY` |
-| Deepgram | https://console.deepgram.com | `DEEPGRAM_API_KEY` |
+| Supabase | https://supabase.com | `DATABASE_URL` |
+| Upstash Redis or Redis Cloud | https://upstash.com or https://redis.io/cloud | `REDIS_URL` |
+| Groq | https://console.groq.com/keys | `GROQ_API_KEY` |
+| Sarvam | https://dashboard.sarvam.ai | `SARVAM_API_KEY` |
 
-Also: [Bun](https://bun.sh) ≥ 1.3, Docker Desktop.
+Also: [Bun](https://bun.sh) ≥ 1.3. Docker is optional when using hosted Supabase and Redis.
 
 ## Run it locally
 
 ```bash
-cp .env.example .env        # fill in the three keys above
+cp .env.example .env        # fill in the provider URLs and keys
 bun install
 
-docker compose up -d postgres redis
 bun run db:migrate          # applies the schema
 bun run db:seed             # synthetic demo caller/matter/appointment (Sarah Miller)
 
@@ -98,6 +100,10 @@ tool calls, handoffs, and measured latency for that call.
   stream (Redis `call-events` → `apps/api` SSE → browser), not polling.
 - `bunx prisma studio` (from `packages/db`, or `bun run db:studio` from root) lets you inspect Postgres directly
   to confirm persistence is independent of the UI.
+
+  For Supabase, create a project, open **Connect**, choose the **Session pooler**, and copy its PostgreSQL URI
+  into `DATABASE_URL`. Replace the password placeholder and keep `sslmode=require`. For Redis, create a database
+  with Upstash or Redis Cloud and copy its TLS connection string into `REDIS_URL`.
 
 ### Optional: full Docker stack
 
@@ -118,11 +124,10 @@ See [`.env.example`](./.env.example) for the complete, commented list. One root 
 
 - **Bun over pnpm.** `CLAUDE.md` suggests pnpm workspaces; the repo was already scaffolded with Bun
   (`create-turbo` default). Functionally equivalent for this monorepo — kept Bun rather than fight the scaffold.
-- **Deepgram for both STT and TTS.** One API key instead of two (Deepgram Nova + Aura), still swappable —
-  `apps/agent/src/entry.ts` is the only place that constructs the STT/TTS clients.
-- **OpenRouter for the realtime LLM via LiveKit's OpenAI-compatible adapter**, pointed at
-  `https://openrouter.ai/api/v1`. Adds one network hop versus calling a provider directly; accepted for model
-  routing flexibility (swap `OPENROUTER_MODEL` without touching code).
+- **Sarvam for STT and TTS.** Sarvam handles Hindi/Indic transcription and Bulbul voice output; both clients
+  are constructed in `apps/agent/src/entry.ts`.
+- **Groq for the realtime and extraction LLM calls.** The realtime path uses LiveKit's OpenAI-compatible
+  adapter pointed at `https://api.groq.com/openai/v1`; structured extraction uses the same endpoint directly.
 - **VAD-based interruption, not the semantic turn-detector plugin.** Real interruption handling (the agent's
   speech is actually cancelled and the new turn processed), just without the extra cloud-inference model. See
   `apps/agent/src/entry.ts`'s `UserStateChanged` handler for the detection heuristic.
