@@ -1,172 +1,191 @@
-# Gideon-Style Voice Intake Orchestrator (V1)
+# SalonFlow Voice Booking Assistant
 
-> **Portfolio demo, not a product.** Synthetic data only. This system does not provide legal advice, does not
-> create an attorney-client relationship, and never makes legal conclusions. See [`CLAUDE.md`](./CLAUDE.md) for
-> the full spec this implements.
+A real-time Hinglish voice assistant for salon customers. A caller can ask about services and prices, find a stylist, create a customer profile, book an appointment, reschedule an existing appointment, or cancel it. Calls, transcripts, tool results, and orchestration events are persisted and visible live in the web console.
 
-A small but genuinely working end-to-end voice-AI intake system for a plaintiff law firm: a caller talks to a
-browser-based voice agent, the agent conducts a structured intake conversation, and everything — transcript,
-extracted case facts, tool calls, agent handoffs, and orchestration events — is persisted and visible live in the
-frontend and in the terminal as it happens.
+This is a portfolio and hackathon demo, not a production booking system. The calendar is deterministic mock availability, payment is not handled, and appointment identity is based on the caller's spoken phone number rather than OTP verification.
+
+## What It Does
+
+- Speaks natural Roman-script Hinglish by default.
+- Uses Sarvam Saaras for Hindi/Hinglish speech recognition in transliteration mode.
+- Uses Sarvam Bulbul for Hindi speech output.
+- Uses Groq for the conversational LLM and structured reasoning.
+- Looks up salon services, prices, durations, descriptions, and stylist specialties from PostgreSQL.
+- Creates and finds customers by normalized phone number.
+- Books only slots returned by the availability service.
+- Retrieves, reschedules, and cancels only the current customer's active appointment.
+- Refuses to claim success until the database tool returns successfully.
+- Streams transcript, phase, tool, latency, interruption, and error events to the frontend through Redis and SSE.
 
 ## Architecture
 
-```
-Browser mic
-    │  WebRTC
-    ▼
-LiveKit (Cloud)  ───────────────────────────────────────────────┐
-    │  media/session transport                                  │ room events
-    ▼                                                            ▼
-apps/agent (LiveKit Agents worker)                          apps/api (Express)
-    │  Silero VAD → Sarvam STT → Groq LLM → Sarvam TTS
-    │  CallOrchestrator (state machine) ─┬─ TriageAgent
-    │                                    ├─ IntakeAgent      (structured extraction via OpenRouterService)
-    │                                    ├─ QualificationAgent (deterministic rules, not LLM-decided)
-    │                                    └─ SchedulingAgent
-    │  ToolRegistry → CaseService / AppointmentService / CallLogService
-    │  EventService ─────────────┬──────────────────────────────►  Postgres (CallEvent, durable)
-    │                            └──────────────────────────────►  Redis `call-events` stream/pub-sub
-    ▼                                                                        │
-Postgres (Caller, Matter, Appointment, Call, TranscriptTurn)                 │ SSE
-                                                                              ▼
-                                                                   apps/web (Next.js) — live console + call history
-```
+```text
+Browser microphone
+    | WebRTC
+    v
+LiveKit Cloud
+    |
+    v
+apps/agent
+    | Silero VAD -> Sarvam STT -> Groq LLM -> Sarvam TTS
+    | CallOrchestrator and phase state
+    | Triage -> Booking Intake -> Booking Review -> Scheduling
+    | ToolRegistry -> catalog, customer, and appointment services
+    |
+    +--> Supabase PostgreSQL: callers, salon catalog, bookings, appointments, transcripts, events
+    +--> Upstash Redis: event stream and per-call pub/sub
 
-**One-sentence architecture summary:** LiveKit handles realtime media and the voice pipeline; `CallOrchestrator`
-owns the business state machine; agents are specialized reasoning policies; tools are the only way the model
-mutates business state; Postgres is the durable source of truth; Redis carries ephemeral events; OpenRouter
-provides model routing; the frontend is a thin observability/demo layer.
-
-## Monorepo layout
-
-```
-apps/
-  web/    Next.js — call console + call history/detail (live via SSE)
-  api/    Express — LiveKit token minting, read models, SSE event stream
-  agent/  LiveKit Agents worker — orchestrator, agents, tools, voice pipeline
-packages/
-  db/     Prisma schema + client + seed
-  shared/ zod schemas, event/phase enums, tool contracts, shared console logger
+apps/api
+    | LiveKit token endpoint, call history, SSE event stream
+    v
+apps/web
+    | live call console, transcript, event timeline, booking state, call history
 ```
 
-## What's real here (and what's intentionally deferred)
+The model proposes language and tool calls. `CallOrchestrator`, `ToolRegistry`, Zod schemas, and typed services decide what is allowed and what reaches PostgreSQL.
 
-Built and working: the full orchestrator/agent/tool/service class set from `CLAUDE.md` §7, the cascaded voice
-pipeline, multi-agent handoffs with a deterministic phase machine, structured extraction validated before
-persistence, Postgres + Redis persistence, interruption logging, measured (not invented) latency, and a live
-frontend fed by Server-Sent Events off the Redis event stream.
+## Repository Layout
 
-Deferred to a follow-up pass (see `CLAUDE.md` §23/§32 for the full list): the 20–30 scripted eval conversations
-and automated eval harness, a broader automated test suite, LiveKit's semantic turn-detector plugin (V1 uses
-standard VAD-based endpointing), and an architecture diagram image / recorded demo.
+```text
+apps/agent/    LiveKit worker, salon agents, policies, tools, services
+apps/api/      Express API, LiveKit token minting, call history, SSE
+apps/web/      Next.js live console and call history
+packages/db/   Prisma schema, migrations, and salon seed data
+packages/shared Shared event, phase, and tool contracts
+docs/video/    Architecture and demo storyboard pages
+```
 
-## Prerequisites
+## Providers
 
-You need six services/accounts. Supabase provides Postgres and a hosted Redis provider replaces the Redis
-container, so Docker is optional.
-
-| Service | Get it at | Env vars |
+| Provider | Purpose | Environment variables |
 |---|---|---|
-| LiveKit Cloud | https://cloud.livekit.io (free project) | `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` |
-| Supabase | https://supabase.com | `DATABASE_URL` |
-| Upstash Redis or Redis Cloud | https://upstash.com or https://redis.io/cloud | `REDIS_URL` |
-| Groq | https://console.groq.com/keys | `GROQ_API_KEY` |
-| Sarvam | https://dashboard.sarvam.ai | `SARVAM_API_KEY` |
+| LiveKit Cloud | WebRTC rooms and agent jobs | `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` |
+| Supabase | PostgreSQL database | `DATABASE_URL`, `DIRECT_URL` |
+| Upstash Redis or Redis Cloud | Live event stream and SSE fan-out | `REDIS_URL` |
+| Groq | Conversation and structured LLM calls | `GROQ_API_KEY`, `GROQ_BASE_URL`, `GROQ_LLM_MODEL` |
+| Sarvam | Hinglish STT and Hindi TTS | `SARVAM_API_KEY`, `SARVAM_LANGUAGE`, `SARVAM_MODE`, `SARVAM_TTS_*` |
 
-Also: [Bun](https://bun.sh) ≥ 1.3. Docker is optional when using hosted Supabase and Redis.
+Docker is optional. The current setup uses hosted Supabase and Upstash Redis.
 
-## Run it locally
+## Setup
 
-```bash
-cp .env.example .env        # fill in the provider URLs and keys
+Requirements: Bun 1.3 or later and access to the provider accounts above.
+
+```powershell
+cd E:\Hackathon\gideon-ai-voice
+Copy-Item .env.example .env
 bun install
-
-bun run db:migrate          # applies the schema
-bun run db:seed             # synthetic demo caller/matter/appointment (Sarah Miller)
-
-bun run dev                 # web (:3000), api (:4000), agent — all with live console logs
 ```
 
-Open http://localhost:3000, click **Start Call**, allow microphone access, and talk through the demo script in
-`CLAUDE.md` §24 (a car-accident intake). Try interrupting the agent mid-sentence — it stops and responds to the
-new input. When you're done, open **Call History** to see the persisted transcript, extracted intake fields,
-tool calls, handoffs, and measured latency for that call.
+Fill `.env` with provider credentials. Keep `.env` private and never commit it.
 
-**Watching it happen** (this is the point of the demo):
-- The `agent` terminal prints a structured, timestamped line for every orchestration step as it happens —
-  phase transitions, tool calls in/out, LLM/TTS timing, transcript turns, handoffs, interruptions.
-- The web console's transcript/intake/timeline panels update live via Server-Sent Events off the same event
-  stream (Redis `call-events` → `apps/api` SSE → browser), not polling.
-- `bunx prisma studio` (from `packages/db`, or `bun run db:studio` from root) lets you inspect Postgres directly
-  to confirm persistence is independent of the UI.
+For Supabase, use the Session Pooler URL for `DATABASE_URL`. `DIRECT_URL` is used by Prisma migrations; if the direct host is unreachable on your network, the reachable pooler can be used for both in this demo.
 
-  For Supabase, create a project, open **Connect**, choose the **Session pooler**, and copy its PostgreSQL URI
-  into `DATABASE_URL`. Replace the password placeholder and keep `sslmode=require`. For Redis, create a database
-  with Upstash or Redis Cloud and copy its TLS connection string into `REDIS_URL`.
+For Redis, use the TLS URL beginning with `rediss://`.
 
-### Optional: full Docker stack
+Apply the schema and seed the salon catalog:
 
-```bash
-docker compose up --build
+```powershell
+bun run db:migrate
+bun run db:seed
 ```
 
-Builds and runs `web`/`api`/`agent` themselves inside Docker too (Postgres/Redis included). The `bun run dev`
-path above is faster to iterate against and keeps all three processes' logs directly visible, so it's the
-recommended day-to-day loop; the full compose stack is there for a closer-to-production smoke test.
+The seed creates these catalog entries:
 
-## Environment variables
+- Women's Haircut: INR 800, 60 minutes
+- Men's Haircut: INR 450, 45 minutes
+- Beard Trim: INR 250, 30 minutes
+- Haircut and Beard Combo: INR 650, 75 minutes
+- Hair Spa: INR 1,200, 60 minutes
+- Global Hair Color: INR 2,500, 150 minutes
+- Highlights: INR 3,500, 180 minutes
+- Facial: INR 1,000, 60 minutes
+- Manicure: INR 600, 45 minutes
+- Pedicure: INR 800, 60 minutes
+- Bridal Makeup: INR 12,000, 240 minutes
 
-See [`.env.example`](./.env.example) for the complete, commented list. One root `.env` is shared by every app
-(`web`/`api`/`agent`/`db`) via `dotenv-cli` — never commit it (already gitignored).
+## Run
 
-## Key design decisions / tradeoffs
+```powershell
+bun run dev
+```
 
-- **Bun over pnpm.** `CLAUDE.md` suggests pnpm workspaces; the repo was already scaffolded with Bun
-  (`create-turbo` default). Functionally equivalent for this monorepo — kept Bun rather than fight the scaffold.
-- **Sarvam for STT and TTS.** Sarvam handles Hindi/Indic transcription and Bulbul voice output; both clients
-  are constructed in `apps/agent/src/entry.ts`.
-- **Groq for the realtime and extraction LLM calls.** The realtime path uses LiveKit's OpenAI-compatible
-  adapter pointed at `https://api.groq.com/openai/v1`; structured extraction uses the same endpoint directly.
-- **VAD-based interruption, not the semantic turn-detector plugin.** Real interruption handling (the agent's
-  speech is actually cancelled and the new turn processed), just without the extra cloud-inference model. See
-  `apps/agent/src/entry.ts`'s `UserStateChanged` handler for the detection heuristic.
-- **CallOrchestrator, not the LLM, owns phase transitions.** `packages/shared/src/phases.ts` defines the
-  allowed state-machine edges; every agent's "handoff" tool calls back into
-  `CallOrchestrator.prepareHandoff()`, which validates the edge before any handoff actually happens
-  (`CLAUDE.md` §28/§34 — the LLM proposes, code decides).
-- **Qualification is deterministic code**, not an LLM judgment call — see
-  `packages/shared/src/intake.ts#evaluateQualification`. `QualificationAgent` only explains the result.
-- **Idempotent appointment scheduling.** `AppointmentService.scheduleFollowUp` keys off
-  `callId + appointmentRequestId` (`CLAUDE.md` §27) and returns the existing appointment on a retried call
-  instead of double-booking.
-- **SSE, not polling, for the live frontend.** `EventService` (agent) publishes every event to a Redis pub/sub
-  channel; `apps/api` forwards it to the browser over Server-Sent Events — the timeline/intake panels update the
-  moment something happens, and it doubles as a visible demonstration of the Redis event stream.
-- **Docker build tradeoff:** the `Dockerfile`s copy the whole workspace and run a single `bun install` per image
-  rather than a slimmed multi-stage prod-only dependency layer — simpler and reliable for a monorepo with a
-  shared lockfile, at the cost of shipping devDependencies in the runtime image. Acceptable for a demo; would be
-  worth tightening for a real deployment.
+Open http://localhost:3000 and click Start Call. The API runs on port 4000 and the documentation site runs on port 3001.
+
+The agent's normal flow is:
+
+```text
+TRIAGE -> INTAKE -> QUALIFICATION -> SCHEDULING -> CONFIRMATION -> COMPLETED
+```
+
+The qualification phase is a booking-readiness review, not a legal qualification decision.
+
+## Example Conversations
+
+### Price question
+
+Caller: `Hair spa kitne ka hai?`
+
+The agent calls `get_salon_services` and answers from the database catalog, including price and duration.
+
+### New booking
+
+Caller: `Mujhe men's haircut book karwana hai.`
+
+The agent identifies the service, collects the customer's name and phone, checks returned availability, offers only returned slots, and books the exact slot selected by the caller.
+
+### Cancellation
+
+Caller: `Mera appointment cancel karwana hai.`
+
+The agent keeps the cancellation intent across turns, asks for the complete registered phone number, retrieves the active appointment, confirms cancellation, and calls `cancel_appointment` only after explicit confirmation.
+
+### Rescheduling
+
+The agent retrieves the existing appointment first, checks new availability, and calls `reschedule_appointment` only with a slot returned by the availability tool.
+
+## Reliability Rules
+
+- Phone numbers are normalized to their last 10 digits for matching.
+- Partial phone numbers are rejected by customer creation.
+- Appointment actions are scoped to the active caller's current booking.
+- Prices and stylist data must come from `get_salon_services`.
+- Booking, rescheduling, and cancellation require successful tool results before confirmation.
+- Appointment writes use idempotency keys.
+- Tool failures become visible tool-failed events instead of uncaught model exceptions.
+- Caller transcripts and events are persisted as the call runs, not only at call end.
+- User interruptions cancel future speech and emit interruption events.
 
 ## Commands
 
-```bash
-bun run dev            # all apps, dev mode
-bun run build           # turbo build across the workspace
-bun run check-types     # turbo typecheck across the workspace
-bun run lint            # turbo lint across the workspace
-
-bun run db:migrate      # apply Prisma migrations
-bun run db:seed         # seed synthetic demo data
-bun run db:studio       # open Prisma Studio
-
-docker compose up -d postgres redis   # infra only (recommended for dev)
-docker compose up --build             # full stack in Docker
+```powershell
+bun run dev
+bun run build
+bun run check-types
+bun run lint
+bun run db:generate
+bun run db:migrate
+bun run db:seed
+bun run db:studio
 ```
 
-## Security / privacy
+`bun run --cwd apps/agent build` also works on Windows and copies policy assets into `dist/policy`.
 
-No real PII — seed data and demo usage are synthetic only. Secrets live in a single gitignored `.env`
-(`.env.example` documents every variable) and are never logged (the shared logger redacts any field whose name
-looks like a key/secret/token). This is a portfolio demo: it does not claim HIPAA, SOC 2, attorney-client
-privilege, or production compliance.
+## Documentation
+
+- `apps/agent/src/policy/` contains salon booking, appointment, escalation, and communication rules.
+- `docs/video/` contains standalone architecture and demo pages.
+- `docs/video/presentation/index.html` is the presentation deck.
+
+## Known Limitations
+
+- Availability is deterministic mock data, not a real salon calendar.
+- There is no SMS OTP or caller identity verification.
+- There is no payment or deposit flow.
+- Stylist preference is catalog information; availability is not yet filtered by stylist.
+- The database retains legacy `Matter` naming internally even though the product language is salon booking.
+- A broader automated conversation evaluation suite is still to be built.
+
+## Security
+
+Use synthetic data only. Secrets belong in the gitignored `.env` file and should be rotated if shared in chat or accidentally exposed. This demo does not claim payment compliance, medical compliance, or production security certification.

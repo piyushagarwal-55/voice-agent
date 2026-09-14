@@ -63,15 +63,15 @@ tr:last-child td{border:0}
       <div class="chain">
         <div class="box aud"><div class="t">Audio in</div><div class="d">PCM frames</div></div>
         <div class="dn"></div>
-        <div class="box mdl"><div class="t">STT model</div><div class="d">Deepgram nova-3</div></div>
+        <div class="box mdl"><div class="t">STT model</div><div class="d">Sarvam Saaras translit</div></div>
         <div class="dn"></div>
         <div class="box txt"><div class="t">TEXT</div><div class="d">discrete, loggable, diffable</div></div>
         <div class="dn"></div>
-        <div class="box mdl"><div class="t">LLM</div><div class="d">via OpenRouter</div></div>
+        <div class="box mdl"><div class="t">LLM</div><div class="d">via Groq</div></div>
         <div class="dn"></div>
         <div class="box txt"><div class="t">TEXT + tool calls</div><div class="d">structured</div></div>
         <div class="dn"></div>
-        <div class="box mdl"><div class="t">TTS model</div><div class="d">Deepgram aura</div></div>
+        <div class="box mdl"><div class="t">TTS model</div><div class="d">Sarvam Bulbul</div></div>
         <div class="dn"></div>
         <div class="box aud"><div class="t">Audio out</div></div>
       </div>
@@ -137,10 +137,9 @@ tr:last-child td{border:0}
     <tr><td>Evaluation</td><td class="win">Text in/out = scriptable evals</td><td>Requires audio-level eval harness</td></tr>
   </table>
 
-  <div class="say">For a <em>legal intake</em> product specifically, the transcript isn't a debugging convenience —
-  it's part of the deliverable. The firm needs a record of what the caller said. That alone pushes me toward
-  cascaded, and the auditability and per-stage swappability are what let me evaluate and improve it.
-  I'd revisit speech-to-speech where emotional nuance matters more than the paper trail.</div>
+  <div class="say">For a <em>salon booking</em> product, the transcript is an engineering and support artifact. It helps
+  explain why a caller asked about a price, why an appointment was changed, and where a conversation recovered or
+  failed. The cascaded architecture makes each boundary inspectable and each provider replaceable.</div>
 
   <h2>What each layer costs you (honest latency framing)</h2>
   <div class="card">

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Voice Intake Orchestrator — Presentation</title>
+<title>SalonFlow Voice Booking — Presentation</title>
 <style>
 :root{--bg:#0a0c11;--panel:#12151d;--panel2:#171b25;--line:#252b39;--soft:#1c212c;--text:#e8ebf2;--dim:#98a1b5;--faint:#626b80;--accent:#7c8cf5;--violet:#a78bfa;--green:#4ade80;--amber:#fbbf24;--red:#f87171;--cyan:#38bdf8;--mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -60,7 +60,7 @@ tr:last-child td{border:0}
 <section class="slide on">
   <div class="kicker">Forward Deployed / AI Engineering</div>
   <h1>Building the layer<br>underneath the abstraction</h1>
-  <p class="lead">A working voice-AI intake system for a plaintiff law firm — realtime voice, multi-agent
+  <p class="lead">A working Hinglish voice-AI booking assistant for a salon — realtime voice, safe tool actions,
   orchestration, deterministic business state, and a full audit trail.</p>
   <p class="lead" style="margin-top:22px;color:var(--faint);font-size:16px">Built after the interview, from the
   gap the interview identified.</p>
@@ -107,7 +107,7 @@ tr:last-child td{border:0}
     <b style="color:#fff">Agents</b> are specialised reasoning policies.
     <b style="color:#fff">Tools</b> are the only way the model mutates business state.
     <b style="color:#fff">Postgres</b> is durable truth, <b style="color:#fff">Redis</b> is ephemeral events,
-    <b style="color:#fff">OpenRouter</b> is model routing, and the <b style="color:#fff">frontend</b> is a thin
+    <b style="color:#fff">Groq</b> handles reasoning, and the <b style="color:#fff">frontend</b> is a thin
     observability layer.
   </div>
   <p class="lead" style="margin-top:26px;font-size:16px;color:var(--faint)">This sentence is still true of the
@@ -121,8 +121,8 @@ tr:last-child td{border:0}
     <tr><th>Concept</th><th>Implementation</th><th>Built or integrated?</th></tr>
     <tr><td>Voice gateway / transport</td><td><code>LiveKit Cloud</code></td><td style="color:var(--amber)">Integrated — deliberately</td></tr>
     <tr><td>Turn detection</td><td><code>Silero VAD</code></td><td style="color:var(--amber)">Integrated</td></tr>
-    <tr><td>STT / TTS</td><td><code>Deepgram nova-3 / aura</code></td><td style="color:var(--amber)">Integrated</td></tr>
-    <tr><td>LLM gateway</td><td><code>OpenRouter</code></td><td style="color:var(--amber)">Integrated</td></tr>
+    <tr><td>STT / TTS</td><td><code>Sarvam Saaras / Bulbul</code></td><td style="color:var(--amber)">Integrated</td></tr>
+    <tr><td>LLM gateway</td><td><code>Groq</code></td><td style="color:var(--amber)">Integrated</td></tr>
     <tr><td><b>Orchestration</b></td><td><code>CallOrchestrator</code></td><td style="color:var(--green)">Built</td></tr>
     <tr><td><b>State machine</b></td><td><code>PHASE_TRANSITIONS</code></td><td style="color:var(--green)">Built</td></tr>
     <tr><td><b>Context engineering</b></td><td><code>ContextService</code></td><td style="color:var(--green)">Built</td></tr>
@@ -157,8 +157,8 @@ tr:last-child td{border:0}
       </ul>
     </div>
   </div>
-  <div class="quote" style="margin-top:24px;font-size:17px">For legal intake the transcript isn't a debugging
-  convenience — it's part of the deliverable. That decided it.</div>
+  <div class="quote" style="margin-top:24px;font-size:17px">For salon booking the transcript is not just debugging
+  convenience — it explains customer intent, appointment changes, and tool outcomes.</div>
 </section>
 
 <section class="slide">
@@ -193,18 +193,18 @@ tr:last-child td{border:0}
 
 <section class="slide">
   <div class="kicker">08 · State machine</div>
-  <h2>9 phases, explicit legal edges</h2>
+  <h2>9 phases, explicit booking edges</h2>
   <div class="flowrow" style="margin-bottom:20px">
     <span class="n">GREETING</span><span class="ar">→</span>
     <span class="n">TRIAGE</span><span class="ar">→</span>
     <span class="n hi">INTAKE</span><span class="ar">→</span>
-    <span class="n hi">QUALIFICATION</span><span class="ar">→</span>
+    <span class="n hi">BOOKING REVIEW</span><span class="ar">→</span>
     <span class="n">SCHEDULING</span><span class="ar">→</span>
     <span class="n">CONFIRMATION</span><span class="ar">→</span>
     <span class="n dat">COMPLETED</span>
   </div>
   <p style="font-family:var(--mono);font-size:14px;color:var(--amber);margin-bottom:20px">
-    ↺ QUALIFICATION → INTAKE when the result is INSUFFICIENT &nbsp;·&nbsp; HANDOFF_HUMAN · ERROR_RECOVERY</p>
+    ↺ BOOKING REVIEW → INTAKE when details are missing &nbsp;·&nbsp; HANDOFF_HUMAN · ERROR_RECOVERY</p>
   <ul>
     <li>Transitions live in a <b>data table</b>, not <code>if</code> statements — printable, testable, showable to a customer</li>
     <li>Adding a phase is a data change, not a refactor</li>
@@ -218,7 +218,7 @@ tr:last-child td{border:0}
   <div class="cols">
     <div class="card"><h3>Triage</h3><p>Why are they calling? Route to intake, answer from policy, or escalate to a human.</p></div>
     <div class="card"><h3>Intake</h3><p>Collect facts conversationally. 6 data tools. Never invents anything.</p></div>
-    <div class="card"><h3>Qualification</h3><p><b>Explains</b> a decision it did not make. Has no tool that can change the outcome.</p></div>
+    <div class="card"><h3>Booking review</h3><p>Checks that the service and customer details are ready before scheduling.</p></div>
     <div class="card"><h3>Scheduling</h3><p>Mock availability + idempotent booking + confirmation.</p></div>
   </div>
   <p class="lead" style="margin-top:22px">Agents exist only where <b>instructions, permitted tools, or reasoning
@@ -226,19 +226,17 @@ tr:last-child td{border:0}
 </section>
 
 <section class="slide">
-  <div class="kicker">10 · Deterministic qualification</div>
-  <h2>The rule a law firm can read</h2>
-  <pre><span class="k">export function</span> <span class="f">evaluateQualification</span>(input) {
-  <span class="k">if</span> (input.representedByAttorney === <span class="k">true</span>)
-    <span class="k">return</span> { status: DISQUALIFIED, reasons: [<span class="s">"already_represented_by_attorney"</span>] };
+  <div class="kicker">10 · Deterministic booking</div>
+  <h2>The rule a salon operator can read</h2>
+  <pre><span class="k">if</span> (serviceSelected &amp;&amp; callerLoaded)
+    <span class="k">return</span> <span class="s">"ready_for_availability"</span>;
 
-  <span class="k">if</span> (hasInjury &amp;&amp; supportedType &amp;&amp; dateKnown)
-    <span class="k">return</span> { status: QUALIFIED, reasons: [] };
+  <span class="k">if</span> (appointmentLookup === <span class="k">null</span>)
+    <span class="k">return</span> <span class="s">"no_active_appointment"</span>;
 
-  <span class="k">return</span> { status: INSUFFICIENT, reasons };
-}</pre>
-  <p class="lead" style="margin-top:20px"><b>Zero LLM calls.</b> Pure function. Same input, same answer, every
-  time — versionable, auditable, unit-testable.</p>
+  <span class="k">return</span> <span class="s">"ask_for_missing_booking_detail"</span>;</pre>
+    <p class="lead" style="margin-top:20px"><b>No appointment claim without a tool result.</b> The booking service
+    validates caller ownership, active status, slot format, and database success before the agent confirms.</p>
 </section>
 
 <section class="slide">
@@ -374,9 +372,9 @@ tr:last-child td{border:0}
   <p class="lead" style="margin-bottom:22px"><b style="color:var(--amber)">Current state: no automated evals
   exist.</b> This is the biggest gap in the project, and here's exactly what belongs here.</p>
   <div class="cols3">
-    <div class="card"><h3>Tier 1 — unit</h3><ul><li>Qualification rules</li><li>Phase transitions</li><li>Field merging</li><li>Tool input schemas</li></ul></div>
-    <div class="card"><h3>Tier 2 — integration</h3><ul><li>Caller + matter creation</li><li>Returning-caller retrieval</li><li><b>Double-booking → 1 row</b></li></ul></div>
-    <div class="card"><h3>Tier 3 — conversations</h3><ul><li>20–30 scripted calls</li><li>Field recall / precision</li><li>Hallucinated fields = 0</li><li>Legal claims = 0</li></ul></div>
+    <div class="card"><h3>Tier 1 — unit</h3><ul><li>Booking readiness rules</li><li>Phase transitions</li><li>Field merging</li><li>Tool input schemas</li></ul></div>
+    <div class="card"><h3>Tier 2 — integration</h3><ul><li>Customer + booking creation</li><li>Returning-customer retrieval</li><li><b>Double-booking → 1 row</b></li></ul></div>
+    <div class="card"><h3>Tier 3 — conversations</h3><ul><li>Price questions</li><li>Booking / reschedule / cancellation</li><li>Hallucinated prices = 0</li><li>False appointment claims = 0</li></ul></div>
   </div>
   <div class="quote" style="margin-top:22px;font-size:17px">The failure mode isn't a crash — it's a confidently
   wrong record. The architecture is eval-ready; the evals aren't written yet.</div>
@@ -395,10 +393,10 @@ tr:last-child td{border:0}
     <div class="card">
       <h3 style="color:var(--green)">What I turned that into</h3>
       <ul>
-        <li>9 phases with legal transitions</li>
-        <li>13 typed intake fields</li>
-        <li>4 explicit qualification rules</li>
-        <li>9 validated tools</li>
+        <li>9 phases with booking transitions</li>
+        <li>Catalog-backed service data</li>
+        <li>Booking ownership checks</li>
+        <li>Appointment lifecycle tools</li>
         <li>A complete audit trail</li>
       </ul>
     </div>

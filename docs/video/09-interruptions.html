@@ -68,7 +68,7 @@ tr:last-child td{border:0}
     <span class="file">packages/shared/src/phases.ts → TurnState — deliberately separate from the business CallPhase</span>
     <div class="note" style="margin-bottom:0"><strong>Two independent state machines.</strong> Being interrupted
     doesn't change what phase of intake you're in. Conflating "the caller is talking over me" with "we are in the
-    qualification stage" would be a modelling error — so <code>TurnState</code> and <code>CallPhase</code> are
+    booking review stage" would be a modelling error — so <code>TurnState</code> and <code>CallPhase</code> are
     separate types that evolve independently.</div>
   </div>
 

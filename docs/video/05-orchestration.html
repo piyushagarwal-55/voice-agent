@@ -56,7 +56,7 @@ tr:last-child td{border:0}
   <div class="card">
     <p>An LLM is a <strong>probabilistic</strong> function. Given the same input it may produce different output, and
     it has no enforceable notion of "not allowed". A business process needs the opposite: the same input must produce
-    the same decision, and illegal transitions must be impossible rather than unlikely.</p>
+    the same decision, and invalid booking transitions must be impossible rather than unlikely.</p>
     <p>So I split them. The model proposes; deterministic code disposes.</p>
   </div>
 
@@ -64,11 +64,11 @@ tr:last-child td{border:0}
     <pre>USER SPEECH
     │
     ▼
-  <span class="c">probabilistic</span>            LLM  ──── proposes: "call proceed_to_qualification"
+  <span class="c">probabilistic</span>            LLM  ──── proposes: "check availability or cancel"
     │
     ▼
   <span class="c">deterministic</span>   CallOrchestrator.prepareHandoff()
-    │                     ├── isTransitionAllowed(INTAKE → QUALIFICATION)?
+    │                     ├── isTransitionAllowed(INTAKE → SCHEDULING)?
     │                     ├── no  → return null → tool replies "not ready yet"
     │                     └── yes → build agent, emit agent.handoff, mutate phase
     ▼
@@ -113,7 +113,7 @@ tr:last-child td{border:0}
 };</pre>
     <span class="file">packages/shared/src/phases.ts</span>
     <div class="note" style="margin-bottom:0"><strong>Why a table and not <code>if</code> statements?</strong>
-    Because it's data. I can print it, diagram it, test it exhaustively, and show a customer the legal paths
+    Because it's data. I can print it, diagram it, test it exhaustively, and show a customer the valid booking paths
     without reading code. Adding a phase is a data change, not a refactor.</div>
   </div>
 
@@ -131,10 +131,10 @@ tr:last-child td{border:0}
     <div>
       <h4 style="color:var(--accent)">Orchestrator</h4>
       <ul>
-        <li>Current phase + legal transitions</li>
+        <li>Current phase + valid transitions</li>
         <li>Which agent is active</li>
         <li>What context is assembled</li>
-        <li>Qualification outcome</li>
+        <li>Booking readiness outcome</li>
         <li>Call lifecycle / teardown</li>
       </ul>
     </div>
@@ -174,27 +174,20 @@ tool({
     <span class="file">apps/agent/src/agents/TriageAgent.ts · orchestrator/CallOrchestrator.ts</span>
   </div>
 
-  <h2>Qualification — deterministic on purpose</h2>
+  <h2>Booking readiness — deterministic on purpose</h2>
   <div class="card">
-    <pre><span class="k">export function</span> <span class="f">evaluateQualification</span>(input): QualificationResult {
-  <span class="k">const</span> hasInjury     = (input.injuries?.length ?? <span class="n">0</span>) &gt; <span class="n">0</span>;
-  <span class="k">const</span> supportedType = SUPPORTED_INCIDENT_TYPES.includes(input.incidentType);
-  <span class="k">const</span> dateKnown     = Boolean(input.incidentDate);
+    <pre><span class="k">if</span> (serviceSelected &amp;&amp; callerLoaded)
+  <span class="k">return</span> <span class="s">"ready_for_availability"</span>;
 
-  <span class="k">if</span> (input.representedByAttorney === <span class="k">true</span>)
-    <span class="k">return</span> { status: DISQUALIFIED, reasons: [<span class="s">"already_represented_by_attorney"</span>] };
+<span class="k">if</span> (appointmentLookup === <span class="k">null</span>)
+  <span class="k">return</span> <span class="s">"no_active_appointment"</span>;
 
-  <span class="k">if</span> (hasInjury &amp;&amp; supportedType &amp;&amp; dateKnown)
-    <span class="k">return</span> { status: QUALIFIED, reasons: [] };
-
-  <span class="k">return</span> { status: INSUFFICIENT, reasons };  <span class="c">// machine-readable why</span>
-}</pre>
-    <span class="file">packages/shared/src/intake.ts — a pure function, zero LLM calls</span>
+<span class="k">return</span> <span class="s">"ask_for_missing_booking_detail"</span>;</pre>
+    <span class="file">ToolRegistry + AppointmentService — typed checks before every write</span>
   </div>
-  <div class="say">This is the line I'd defend hardest. A law firm cannot have a language model deciding who is
-  disqualified — that has to be a rule someone can read, version, and audit. The model's job is to figure out
-  <em>whether the caller said they have an attorney</em>. The rule's job is to decide what that means.
-  <code>QualificationAgent</code> only explains the outcome; it has no tool that can change it.</div>
+  <div class="say">The agent does not decide appointment truth from conversation alone. The model can propose a
+  booking action, but the typed appointment service validates the caller, the appointment, the slot, and the database
+  result. The caller hears success only after the write succeeds.</div>
 
   <h2>Tool execution — one wrapper, four guarantees</h2>
   <div class="card">
@@ -203,7 +196,7 @@ tool({
       <tr><td>No schema drift</td><td>The zod schema that validates input is the same one that generates the JSON schema the LLM sees</td></tr>
       <tr><td>Every call is observable</td><td><code>tool.started</code> with input → <code>tool.completed</code> with output + <code>durationMs</code></td></tr>
       <tr><td>Failures never crash the call</td><td>Exceptions are caught and returned as <code>{ error }</code> so the agent can apologise and retry verbally</td></tr>
-      <tr><td>Retries are safe where it matters</td><td><code>schedule_follow_up</code> keys on <code>callId + appointmentRequestId</code>, unique-constrained in Postgres</td></tr>
+      <tr><td>Retries are safe where it matters</td><td>Booking, reschedule, and cancel requests use idempotency keys and active-record checks</td></tr>
     </table>
   </div>
 
@@ -215,7 +208,7 @@ tool({
       <tr><td>Orchestrator</td><td>Control flow, phase, permissions</td><td>Call cannot proceed — by design</td></tr>
       <tr><td>Tools + services</td><td>All state mutation</td><td>Agent reports failure verbally, keeps talking</td></tr>
       <tr><td>PostgreSQL</td><td>Durable business truth</td><td>Real outage — this is the thing that must not be lost</td></tr>
-      <tr><td>Redis</td><td>Events, live feed</td><td>UI goes quiet; <strong>the matter is untouched</strong></td></tr>
+      <tr><td>Redis</td><td>Events, live feed</td><td>UI goes quiet; <strong>the booking record is untouched</strong></td></tr>
       <tr><td>LiveKit</td><td>Media transport, session</td><td>Call drops; DB state already persisted per-turn</td></tr>
     </table>
     <div class="note" style="margin-bottom:0">That last column is the point of the separation. I persist intake

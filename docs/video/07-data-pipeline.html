@@ -52,8 +52,8 @@ tr:last-child td{border:0}
   <div class="steps">
     <div class="step"><div class="num">01</div><div class="body">
       <h4>Caller speaks</h4>
-      <p>"I was rear-ended on the 26th of May in Mumbai, hurt my leg."</p>
-      <span class="mini">audio frames → Deepgram nova-3</span>
+      <p>"Hair spa kitne ka hai aur Saturday ko appointment milega?"</p>
+      <span class="mini">audio frames → Sarvam Saaras translit</span>
     </div></div>
     <div class="step"><div class="num">02</div><div class="body">
       <h4>STT emits finals — usually several</h4>
@@ -68,10 +68,10 @@ tr:last-child td{border:0}
     <div class="step"><div class="num">04</div><div class="body">
       <h4>Structured extraction — background, non-blocking</h4>
       <p>A second LLM call with a strict JSON schema pulls typed facts out of the free text. It runs detached so it never delays the spoken reply.</p>
-      <pre style="margin-top:6px">{ "incidentType": "motor_vehicle_accident",
-  "incidentDate": "2026-05-26",
-  "incidentLocation": "Mumbai",
-  "injuries": ["leg"] }</pre>
+        <pre style="margin-top:6px">{ "service": "Hair Spa",
+      "priceInr": 1200,
+      "durationMin": 60,
+      "preferredDay": "Saturday" }</pre>
     </div></div>
     <div class="step"><div class="num">05</div><div class="body">
       <h4>Validated before it is trusted</h4>
@@ -86,7 +86,7 @@ tr:last-child td{border:0}
     <div class="step"><div class="num">07</div><div class="body">
       <h4>Persisted through a typed service</h4>
       <p><code>CaseService.updateIntake()</code> is the only writer. Field names match <code>IntakeFields</code> 1:1 — no translation layer to drift.</p>
-      <span class="mini">Postgres: Matter row updated</span>
+      <span class="mini">Postgres: customer and booking record updated</span>
     </div></div>
     <div class="step"><div class="num">08</div><div class="body">
       <h4>Event emitted to three places</h4>
@@ -95,7 +95,7 @@ tr:last-child td{border:0}
     </div></div>
     <div class="step"><div class="num">09</div><div class="body">
       <h4>Frontend updates live</h4>
-      <p>Redis pub/sub → API SSE → React. The Case Details panel fills in mid-sentence, with no polling.</p>
+      <p>Redis pub/sub → API SSE → React. The booking status panel fills in mid-sentence, with no polling.</p>
       <span class="mini">useCallEventStream → deriveCallState</span>
     </div></div>
     <div class="step"><div class="num">10</div><div class="body">
@@ -119,11 +119,10 @@ tr:last-child td{border:0}
   </div>
   <div class="grid2" style="margin-top:14px">
     <div class="card">
-      <h3>Matter — 13 structured intake fields</h3>
-      <p style="font-family:var(--mono);font-size:12px;line-height:1.9">incidentType · incidentDate · incidentLocation ·
-      incidentDescription · injuries[] · treatmentReceived · emergencyServicesInvolved · policeReport ·
-      insuranceInformation · otherPartyInformation · witnesses · lostWages · representedByAttorney</p>
-      <p>Plus <code>status</code>, <code>qualificationStatus</code>, <code>notes</code>.</p>
+      <h3>Salon catalog and booking fields</h3>
+      <p style="font-family:var(--mono);font-size:12px;line-height:1.9">service name · category · description · priceInr ·
+      durationMin · active · stylist specialties · appointment slot · appointment status</p>
+      <p>Plus customer phone, call status, transcript, events, and idempotency keys.</p>
     </div>
     <div class="card">
       <h3>Why CallEvent is its own table</h3>
@@ -131,7 +130,7 @@ tr:last-child td{border:0}
         <li>The call can be replayed from events alone — the frontend literally does this via <code>deriveCallState()</code></li>
         <li><code>durationMs</code> on the row makes latency queryable in SQL</li>
         <li>Indexed on <code>callId</code> and <code>type</code> — "show me every <code>tool.failed</code> this week" is one query</li>
-        <li>It's the audit trail a law firm's compliance person would actually want</li>
+        <li>It is the audit trail a salon operator needs to understand a booking conversation</li>
       </ul>
     </div>
   </div>
@@ -139,13 +138,13 @@ tr:last-child td{border:0}
   <h2>Source of truth — the rule I keep</h2>
   <table>
     <tr><th>Store</th><th>Holds</th><th>Survives restart?</th><th>Losing it means</th></tr>
-    <tr><td>PostgreSQL</td><td>Caller, Matter, Appointment, Call, Transcript, Events</td><td style="color:#4ade80">Yes</td><td>Actual data loss — this is the product</td></tr>
+    <tr><td>PostgreSQL</td><td>Customer, catalog, booking, appointment, call, transcript, events</td><td style="color:#4ade80">Yes</td><td>Actual data loss — this is the product</td></tr>
     <tr><td>Redis</td><td>Event stream + per-call pub/sub channel</td><td style="color:#fbbf24">Not required to</td><td>Live UI goes quiet; business state intact</td></tr>
     <tr><td><code>CallState</code> (memory)</td><td>Current phase, collected fields, turn state</td><td style="color:#f87171">No</td><td>In-flight call degrades; everything already persisted survives</td></tr>
   </table>
   <div class="note"><strong>Why persist per-turn instead of at call end?</strong> Because calls drop. If I only wrote
   on <code>call.ended</code>, a caller hanging up mid-intake would lose everything they just told us. Writing as
-  facts arrive means a dropped call still leaves a partially-complete matter a human can pick up.</div>
+  facts arrive means a dropped call still leaves a partially-complete booking record a salon operator can review.</div>
 
   <h2>The claim I will not make</h2>
   <div class="card">
@@ -153,7 +152,7 @@ tr:last-child td{border:0}
     reply is <em>conversation</em>. The structured extraction is a <em>proposal</em>. Only after zod validation and a
     typed service call does anything become business state. Every write is attributable to a specific tool call,
     logged with its input, output and duration.</p>
-    <p>That distinction is what makes this deployable at a law firm rather than a chatbot demo.</p>
+    <p>That distinction is what makes this a reliable booking workflow rather than a chatbot that invents prices or appointments.</p>
   </div>
 </div>
 </body>

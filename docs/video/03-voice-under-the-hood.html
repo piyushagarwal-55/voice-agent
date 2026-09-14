@@ -120,7 +120,7 @@ tr:last-child td{border:0}
     </div>
     <div class="card">
       <h3>TTS — streaming synthesis</h3>
-      <p>Text is chunked by a sentence tokenizer and streamed to Deepgram over a websocket; audio frames come back
+      <p>Text is chunked by a sentence tokenizer and streamed to Sarvam Bulbul; audio frames come back
       and are pushed into the LiveKit track as they arrive.</p>
       <ul>
         <li>We never wait for the full response before speaking</li>
@@ -146,8 +146,8 @@ tr:last-child td{border:0}
       <h4>The orchestrator decides</h4>
       <ul>
         <li>Which phase the call is in — <code>isTransitionAllowed()</code></li>
-        <li>Whether a handoff is legal — <code>prepareHandoff()</code></li>
-        <li>Whether the caller qualifies — <code>evaluateQualification()</code></li>
+        <li>Whether a phase transition is allowed — <code>prepareHandoff()</code></li>
+        <li>Whether booking details are ready — booking review logic</li>
         <li>Which tools even exist for this agent</li>
         <li>What context the model is allowed to see</li>
         <li>What actually gets written to Postgres</li>
@@ -165,12 +165,12 @@ tr:last-child td{border:0}
     <tr><td>Words / semantic content</td><td style="color:#4ade80">Yes</td><td>This is what the whole pipeline is built on</td></tr>
     <tr><td>Rough timing / pauses</td><td style="color:#fbbf24">Partly</td><td>Available as timestamps, not as meaning</td></tr>
     <tr><td>Prosody, intonation</td><td style="color:#f87171">No</td><td>"Fine." (angry) and "Fine!" (relieved) become identical text</td></tr>
-    <tr><td>Emotion / distress</td><td style="color:#f87171">No</td><td>Real gap for an injury intake line — a distressed caller reads as neutral</td></tr>
+    <tr><td>Emotion / distress</td><td style="color:#f87171">No</td><td>Real gap for a booking assistant — emotional tone is not classified</td></tr>
     <tr><td>Speaker identity / overlap</td><td style="color:#f87171">No</td><td>No diarization configured; two people on speakerphone merge</td></tr>
     <tr><td>Background acoustics</td><td style="color:#f87171">No</td><td>Can't tell "roadside, just crashed" from "quiet office"</td></tr>
   </table>
   <div class="note">I chose to accept this loss. In exchange I get an exact transcript I can log, replay, diff,
-  evaluate and show a compliance reviewer — which for a legal intake product is worth more than prosody.
+  evaluate and show a product reviewer — which is useful for improving booking accuracy and recovery flows.
   That's a tradeoff I made deliberately, not a limitation I didn't notice.</div>
 
   <h2>Two different meanings of "architecture"</h2>

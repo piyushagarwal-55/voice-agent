@@ -133,7 +133,7 @@ session.on(UserInputTranscribed, (ev) =&gt; {
   turnStartedAt = <span class="k">null</span>;
 }</pre>
     <p style="margin-top:10px">That single event turns the Latency panel from a list of stage timings into the number
-    that actually matters — and it's the number Biswa will ask about.</p>
+    that actually matters — and it's the number a salon customer experiences.</p>
   </div>
 
   <h2>Why streaming is non-negotiable</h2>
@@ -174,8 +174,8 @@ session.on(UserInputTranscribed, (ev) =&gt; {
   </div>
   <div class="say">The extraction one is my favourite because it's a real bug I introduced and then fixed. I had it
   awaited inline, which meant every single turn paid for two sequential LLM calls before the agent could speak.
-  Moving it to a tracked background promise — with qualification awaiting that exact promise before it reads the
-  fields — kept correctness while removing a whole round-trip from the critical path.</div>
+  Moving non-critical work to a tracked background promise while appointment actions await the exact database result
+  keeps the call responsive without sacrificing booking correctness.</div>
 
   <h2>Not yet done — name these if asked</h2>
   <div class="card">

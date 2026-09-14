@@ -56,20 +56,20 @@ tr:last-child td{border:0}
     <div class="blk"><span class="l">roleInstructions</span><span class="r">per-agent — differs for Triage / Intake / Qualification / Scheduling</span></div>
     <div class="blk dyn"><span class="l">CURRENT PHASE</span><span class="r">from <code>state.currentPhase</code> — the model always knows where it is</span></div>
     <div class="blk dyn"><span class="l">KNOWN CALLER</span><span class="r">name / phone / email, or "unknown (not yet collected)"</span></div>
-    <div class="blk dyn"><span class="l">KNOWN MATTER FIELDS</span><span class="r">only fields actually collected — empty ones are omitted entirely</span></div>
+    <div class="blk dyn"><span class="l">KNOWN BOOKING FIELDS</span><span class="r">only fields actually collected — empty ones are omitted entirely</span></div>
     <div class="blk dyn"><span class="l">REQUIRED MISSING FIELDS</span><span class="r">derived getter — this is what drives the next question</span></div>
     <div class="blk pol"><span class="l">RELEVANT POLICY</span><span class="r">topic-selected docs only, not the whole knowledge base</span></div>
     <div class="blk"><span class="l">RECENT CONVERSATION</span><span class="r">optional bounded excerpt — caller passes it in explicitly</span></div>
-    <div class="blk"><span class="l">GLOBAL RULES</span><span class="r">7 hard constraints — no legal advice, no invented facts, one question at a time</span></div>
+    <div class="blk"><span class="l">GLOBAL RULES</span><span class="r">salon facts from tools, no invented prices, one question at a time</span></div>
   </div>
   <span class="file">apps/agent/src/orchestrator/ContextService.ts → buildInstructions()</span>
 
   <h2>What I deliberately leave out</h2>
   <div class="stack">
     <div class="excl"><span class="l">✗ full transcript</span><span class="r">grows unbounded; LiveKit already maintains the chat context window</span></div>
-    <div class="excl"><span class="l">✗ whole database</span><span class="r">irrelevant callers/matters are noise that invites cross-contamination</span></div>
+    <div class="excl"><span class="l">✗ whole database</span><span class="r">irrelevant customers and bookings invite cross-contamination</span></div>
     <div class="excl"><span class="l">✗ all policy documents</span><span class="r">Scheduling doesn't need escalation rules; Triage doesn't need appointment rules</span></div>
-    <div class="excl"><span class="l">✗ empty/null fields</span><span class="r">"incidentDate: null" teaches the model nothing but costs tokens</span></div>
+    <div class="excl"><span class="l">✗ empty/null fields</span><span class="r">empty booking fields teach the model nothing but cost tokens</span></div>
     <div class="excl"><span class="l">✗ raw tool JSON dumps</span><span class="r">tool results return typed summaries, not entire rows</span></div>
     <div class="excl"><span class="l">✗ every tool</span><span class="r">each agent only sees the tools its role permits — capability scoping</span></div>
   </div>
@@ -85,7 +85,7 @@ tr:last-child td{border:0}
     roleInstructions.trim(),
     <span class="s">`CURRENT PHASE\n${state.currentPhase}`</span>,
     <span class="s">`KNOWN CALLER\n${formatCaller(state)}`</span>,
-    <span class="s">`KNOWN MATTER FIELDS\n${formatFields(state)}`</span>,
+    <span class="s">`KNOWN BOOKING FIELDS\n${formatFields(state)}`</span>,
     <span class="s">`REQUIRED MISSING FIELDS\n${state.missingRequiredFields.join(", ") || "none"}`</span>,
   ];
   <span class="k">if</span> (policyTopics.length &gt; <span class="c">0</span>)
@@ -112,7 +112,7 @@ tr:last-child td{border:0}
       <p>Six documents load once at boot (4 markdown + 2 JSON). Each agent declares which topics it needs:</p>
       <pre style="font-size:12px">Triage        → ["communication", "escalation"]
 Intake        → ["intake", "communication"]
-Qualification → ["communication"]
+Booking review → ["communication"]
 Scheduling    → ["appointment", "communication"]</pre>
       <span class="file">services/PolicyService.ts</span>
     </div>
@@ -131,10 +131,10 @@ Scheduling    → ["appointment", "communication"]</pre>
   <h2>Two kinds of retrieval in this system</h2>
   <table>
     <tr><th></th><th>Structured retrieval</th><th>Knowledge retrieval</th></tr>
-    <tr><td>Question</td><td>"Who is this caller, and what do we already have?"</td><td>"What are the firm's rules here?"</td></tr>
-    <tr><td>Mechanism</td><td><code>get_caller(phone)</code> → returns caller + most recent open matter → <code>get_matter(id)</code></td><td><code>PolicyService.getDocs(topics)</code></td></tr>
+    <tr><td>Question</td><td>"Who is this customer, and what booking do they already have?"</td><td>"What are the salon rules here?"</td></tr>
+    <tr><td>Mechanism</td><td><code>get_caller(phone)</code> → returns caller + current booking → <code>get_appointment()</code></td><td><code>PolicyService.getDocs(topics)</code></td></tr>
     <tr><td>Backed by</td><td>Postgres, unique index on phone</td><td>Local markdown/JSON, loaded at boot</td></tr>
-    <tr><td>Enters context via</td><td>Tool result → merged into <code>CallState.collectedFields</code> → next prompt's KNOWN MATTER block</td><td><code>RELEVANT POLICY</code> block</td></tr>
+    <tr><td>Enters context via</td><td>Tool result → merged into <code>CallState</code> → next prompt's KNOWN BOOKING block</td><td><code>RELEVANT POLICY</code> block</td></tr>
     <tr><td>Failure mode</td><td>Caller not found → agent collects from scratch</td><td>Missing doc → empty string, agent falls back to global rules</td></tr>
   </table>
 
@@ -148,7 +148,7 @@ Scheduling    → ["appointment", "communication"]</pre>
    → NEXT TURN'S CONTEXT IS DIFFERENT       <span class="c">// ← the loop</span>
    → agent asks about something it still needs</pre>
     <p style="margin-top:10px">The prompt is never static. Each turn it reflects everything known so far — which is
-    why the agent stops asking about injuries once injuries are recorded, without any explicit "don't repeat
+    why the agent stops asking about a service once the service is recorded, without any explicit "don't repeat
     yourself" instruction.</p>
   </div>
   <div class="note"><strong>Token/latency argument, if pushed:</strong> every block I exclude is tokens I don't pay
