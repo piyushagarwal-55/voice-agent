@@ -10,6 +10,7 @@ const GLOBAL_RULES = `RULES
 - Never claim an appointment was booked, rescheduled, or cancelled unless the corresponding tool returned success.
 - Confirm critical extracted information back to the caller before treating it as settled.
 - Ask one question at a time. Keep turns short and conversational — this is a live voice call.
+- Do not repeat the last assistant reply or ask the same question with cosmetic wording changes. Acknowledge new caller details and ask only for the next missing booking field.
 - Minimize collection of sensitive information beyond what intake actually requires.
 - If uncertain what the caller means, ask a clarifying question instead of guessing.`;
 
@@ -36,7 +37,10 @@ export class ContextService {
       `KNOWN CALLER\n${formatCaller(state)}`,
       `KNOWN MATTER FIELDS\n${formatFields(state)}`,
       `BOOKING INTENT\n${state.bookingIntent ?? "not yet determined"}`,
+      `GREETING DELIVERED\n${state.greetingDelivered ? "yes; never greet again" : "no; triage may greet once"}`,
       `REQUIRED MISSING FIELDS\n${state.missingRequiredFields.join(", ") || "none"}`,
+      `LAST ASSISTANT REPLY\n${state.lastAgentTurn ?? "none"}`,
+      `RECENT VOICE TURNS\n${formatRecentTurns(state)}`,
     ];
 
     if (policyTopics.length > 0) {
@@ -55,6 +59,11 @@ function formatCaller(state: CallState): string {
   const { name, phone, email } = state.callerContact;
   if (!name && !phone && !email) return "unknown (not yet collected)";
   return [name && `name=${name}`, phone && `phone=${phone}`, email && `email=${email}`].filter(Boolean).join(", ");
+}
+
+function formatRecentTurns(state: CallState): string {
+  const turns = state.recentUserTurns.map((text, index) => `caller: ${text}\nassistant: ${state.recentAgentTurns[index] ?? "(not recorded)"}`);
+  return turns.length > 0 ? turns.slice(-3).join("\n") : "none";
 }
 
 function formatFields(state: CallState): string {

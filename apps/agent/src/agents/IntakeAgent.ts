@@ -32,7 +32,7 @@ export function createIntakeAgent(orchestrator: CallOrchestrator): Agent {
       orchestrator.tools.addCallNote(),
       tool({
         name: "proceed_to_qualification",
-        description: "Move to qualification once enough case facts have been gathered (or the caller has no more to share).",
+        description: "Move to booking review once enough booking details have been gathered (or the caller has no more to share).",
         parameters: z.object({}),
         execute: async () => {
           const result = orchestrator.prepareHandoff(AgentName.QUALIFICATION);
@@ -43,7 +43,7 @@ export function createIntakeAgent(orchestrator: CallOrchestrator): Agent {
       orchestrator.tools.endCall(),
     ],
     // Structured extraction is not wired here: it runs for every user turn in every
-    // phase, from CallOrchestrator.recordUserTurn (callers describe the incident during
+    // phase, from CallOrchestrator.recordUserTurn (callers share booking details during
     // TRIAGE, long before this agent takes over).
     onEnter: async (ctx) => {
       // Without this the handoff lands in dead air: triage says "connecting you now",
@@ -54,14 +54,14 @@ export function createIntakeAgent(orchestrator: CallOrchestrator): Agent {
         ? "The caller wants to cancel an existing appointment. Ask only for their complete registered phone number in Roman Hinglish. Do not ask for a service, date, or new booking details."
         : orchestrator.state.bookingIntent === "reschedule"
           ? "The caller wants to reschedule an existing appointment. Ask only for their complete registered phone number in Roman Hinglish. Do not ask for a service or new booking details yet."
-          : "The caller wants a new salon booking. Ask which service they want in Roman Hinglish.";
+          : "The caller wants a new salon booking. Ask only for the next missing booking detail in Roman Hinglish.";
       ctx.session.generateReply({
         instructions:
-          "You have just taken over the conversation. Do not greet the caller again, do not " +
+          "Continue the existing conversation without any greeting, introduction, prayer, or repeated welcome. Do not " +
           "introduce yourself as a new person, and never tell them to hold or wait — you are the " +
           "one collecting these details, right now. " + entryInstruction + " If the caller gives only a partial " +
           "number, ask them to repeat the full number and do not start a new booking." +
-          (missing.length > 0 ? ` Still missing: ${missing.join(", ")}.` : " Confirm the booking details you have so far."),
+          (missing.length > 0 ? ` Still missing: ${missing.join(", ")}. Ask for exactly one, preferably the first missing field.` : " Confirm the booking details you have so far."),
       });
     },
   });

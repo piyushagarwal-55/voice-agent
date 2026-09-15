@@ -46,7 +46,7 @@ export function createQualificationAgent(orchestrator: CallOrchestrator): Agent 
       const reasonText = result.reasons.length > 0 ? ` (${result.reasons.join(", ")})` : "";
       ctx.session.generateReply({
         instructions:
-          `Qualification result: ${result.status}${reasonText}. Explain this briefly to the caller per your ` +
+          `Booking readiness result: ${result.status}${reasonText}. Do not recap the greeting or repeat collected details. Explain this briefly per your ` +
           (result.status === QualificationStatus.QUALIFIED
             ? "QUALIFIED instructions, then call proceed_to_scheduling."
             : result.status === QualificationStatus.DISQUALIFIED

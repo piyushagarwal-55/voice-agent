@@ -50,16 +50,22 @@ export class CaseService {
 
   /**
    * Merges partial structured intake fields into the Matter row. Field names
-   * are a 1:1 match with `IntakeFields` by design (packages/shared/src/intake.ts)
-   * so no translation layer sits between "what the LLM extracted" and "what
-   * Postgres stores" — only validation (already done via zod before this is
-   * called) and the incidentDate string->Date conversion.
+  * The Prisma columns retain their original names for compatibility with the
+  * existing database. Salon terminology is translated at this boundary only.
    */
   async updateIntake(matterId: string, fields: IntakeFields): Promise<Matter> {
     const data: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(fields)) {
+    const columnByField: Record<string, string> = {
+      serviceRequested: "incidentType",
+      preferredDate: "incidentDate",
+      bookingNotes: "incidentDescription",
+      stylistPreference: "otherPartyInformation",
+    };
+    for (const [field, value] of Object.entries(fields)) {
       if (value === undefined || value === null) continue;
       if (Array.isArray(value) && value.length === 0) continue;
+      const key = columnByField[field];
+      if (!key) continue;
       data[key] = key === "incidentDate" && typeof value === "string" ? new Date(value) : value;
     }
     return prisma.matter.update({ where: { id: matterId }, data });

@@ -144,10 +144,9 @@ export class CallOrchestrator {
     const result = this.state.matterId
       ? { status: "QUALIFIED" as const, reasons: [] }
       : evaluateQualification({
-      incidentType: this.state.collectedFields.incidentType,
-      incidentDate: this.state.collectedFields.incidentDate,
-      injuries: this.state.collectedFields.injuries,
-      representedByAttorney: this.state.collectedFields.representedByAttorney,
+      serviceRequested: this.state.collectedFields.serviceRequested,
+      preferredDate: this.state.collectedFields.preferredDate,
+      preferredTime: this.state.collectedFields.preferredTime,
       });
     this.state.qualificationStatus = result.status;
     if (this.state.matterId) {
@@ -171,7 +170,7 @@ export class CallOrchestrator {
 
   /**
    * Structured extraction runs on every user turn in every phase — callers routinely
-   * describe the whole incident during TRIAGE, before any handoff to IntakeAgent, and
+  * share booking details during TRIAGE, before any handoff to IntakeAgent, and
    * facts stated there must still land in the right field (CLAUDE.md §36). It is
    * deliberately not awaited: the framework blocks the spoken reply on the turn
    * callbacks, and this is a second full LLM round trip. runQualification() awaits
@@ -215,6 +214,8 @@ export class CallOrchestrator {
 
   async recordAgentTurn(text: string) {
     if (!text.trim()) return;
+    this.state.lastAgentTurn = text;
+    this.state.pushRecentAgentTurn(text);
     await this.callLogService.addTranscriptTurn(this.state.callId, "AGENT", text);
   }
 

@@ -30,8 +30,10 @@ export class CallState {
 
   conversationSummary: string | null = null;
   lastUserTurn: string | null = null;
+  lastAgentTurn: string | null = null;
   pendingAction: string | null = null;
   bookingIntent: "new" | "reschedule" | "cancel" | null = null;
+  greetingDelivered = false;
 
   interruptionCount = 0;
 
@@ -49,6 +51,7 @@ export class CallState {
    * context that makes those fragments interpretable.
    */
   readonly recentUserTurns: string[] = [];
+  readonly recentAgentTurns: string[] = [];
 
   pushRecentUserTurn(text: string): void {
     this.recentUserTurns.push(text);
@@ -57,12 +60,19 @@ export class CallState {
     }
   }
 
+  pushRecentAgentTurn(text: string): void {
+    this.recentAgentTurns.push(text);
+    if (this.recentAgentTurns.length > RECENT_USER_TURN_WINDOW) {
+      this.recentAgentTurns.shift();
+    }
+  }
+
   constructor(params: { callId: string; roomName: string }) {
     this.callId = params.callId;
     this.roomName = params.roomName;
   }
 
-  /** Required fields not yet collected — drives IntakeAgent's next question and QualificationAgent's checks. */
+  /** Required booking fields not yet collected — drives the next question. */
   get missingRequiredFields(): string[] {
     return REQUIRED_INTAKE_FIELDS.filter((field) => {
       const value = this.collectedFields[field];

@@ -30,8 +30,8 @@ export function createSchedulingAgent(orchestrator: CallOrchestrator): Agent {
     onEnter: async (ctx) => {
       ctx.session.generateReply({
         instructions:
-          "You have just taken over to book a follow-up call. Do not greet the caller again and " +
-          "do not tell them to hold. Ask whether they want a new booking, a reschedule, or a cancellation, then follow the appropriate appointment workflow.",
+          "Continue the existing booking conversation without greeting, introduction, or repeating the caller's request. " +
+          "The booking intent is already known in context. Ask only for the next missing detail or use the correct appointment tool now.",
       });
     },
   });

@@ -49,7 +49,7 @@ export class OpenRouterService {
           {
             role: "system",
             content:
-              "You extract structured intake facts for a plaintiff law firm's intake system. " +
+              "You extract structured salon booking facts for a voice receptionist. " +
               "Report ONLY facts the caller explicitly stated in the conversation excerpt. " +
               "Never invent, assume, or infer a value that was not said. " +
               "Omit (leave null) any field that is still unknown. " +
@@ -84,7 +84,7 @@ export class OpenRouterService {
     return { fields: validated.data, durationMs };
   }
 
-  /** Short human-readable case summary for the call-ended confirmation + Call.finalSummary. */
+  /** Short human-readable booking summary for the call-ended confirmation + Call.finalSummary. */
   async summarizeCall(input: { transcriptExcerpt: string; fields: IntakeFields }): Promise<string> {
     try {
       const result = await chatCompletion({
@@ -93,8 +93,8 @@ export class OpenRouterService {
           {
             role: "system",
             content:
-              "Write a concise (2-4 sentence) internal case summary for a law firm intake record. " +
-              "Factual only, no legal conclusions or advice, no promises of representation.",
+              "Write a concise (2-4 sentence) internal salon booking summary. " +
+              "Include the requested service, preferred time, caller details, and booking outcome only.",
           },
           {
             role: "user",

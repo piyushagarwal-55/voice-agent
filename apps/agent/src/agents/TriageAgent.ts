@@ -61,6 +61,7 @@ Greet the caller and understand whether they want information, a new booking, a 
       orchestrator.tools.endCall(),
     ],
     onEnter: async (ctx) => {
+      orchestrator.state.greetingDelivered = true;
       ctx.session.generateReply({
         instructions:
           "Greet the caller in natural Hinglish using Roman Hindi and simple English, identify yourself as the salon's automated booking assistant, and ask which service they need today.",

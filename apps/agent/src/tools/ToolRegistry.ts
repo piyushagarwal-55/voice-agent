@@ -40,7 +40,7 @@ const TOOL_DESCRIPTIONS = {
   get_caller:
     "Look up an existing caller by phone number. Also returns their most recent open matter if they've called before — pass that matterId to get_matter to load what was already collected, instead of asking again.",
   create_caller: "Create a new caller record. Only call after you have the caller's name and phone number.",
-  create_matter: "Create a new matter (case) for a caller once you know the incident type.",
+  create_matter: "Create a new salon booking record once you know the requested service.",
   update_matter_intake: "Persist newly-learned structured intake fields onto the current matter. Call this whenever the caller gives new facts — do not wait until the end of the call.",
   get_matter: "Retrieve the current structured state of a matter, including anything already collected in a previous call.",
   check_appointment_availability: "Get mock available follow-up call slots near the caller's preferred time. Always call this before offering a specific time.",
@@ -165,7 +165,7 @@ export class ToolRegistry {
         name: caller.name,
         email: caller.email,
         existingMatter: existing
-          ? { matterId: existing.id, incidentType: existing.incidentType, status: existing.status }
+          ? { matterId: existing.id, serviceRequested: existing.incidentType, status: existing.status }
           : null,
       };
     });
@@ -182,10 +182,10 @@ export class ToolRegistry {
   }
 
   createMatter() {
-    return this.wrap("create_matter", createMatterInputSchema, async (args: { callerId: string; matterType: string }) => {
-      const matter = await this.deps.caseService.createMatter(args);
+    return this.wrap("create_matter", createMatterInputSchema, async (args: { callerId: string; serviceRequested: string }) => {
+      const matter = await this.deps.caseService.createMatter({ callerId: args.callerId, matterType: args.serviceRequested });
       this.deps.state.matterId = matter.id;
-      this.deps.state.mergeIntakeFields({ incidentType: matter.incidentType as never });
+      this.deps.state.mergeIntakeFields({ serviceRequested: matter.incidentType });
       await this.deps.callLogService.attachCallerAndMatter(this.deps.state.callId, { matterId: matter.id });
       // Flush anything already gathered in-memory before the matter existed (e.g. extracted
       // during triage) so it isn't silently lost now that there's somewhere to persist it.
@@ -214,19 +214,10 @@ export class ToolRegistry {
       if (!matter) return { matterId: null, found: false, status: null, qualificationStatus: null, fields: null };
       // Retrieval within the same call (CLAUDE.md demo item 6): sync into live state.
       this.deps.state.mergeIntakeFields({
-        incidentType: matter.incidentType as never,
-        incidentDate: matter.incidentDate?.toISOString().slice(0, 10) ?? null,
-        incidentLocation: matter.incidentLocation,
-        incidentDescription: matter.incidentDescription,
-        injuries: matter.injuries,
-        treatmentReceived: matter.treatmentReceived,
-        emergencyServicesInvolved: matter.emergencyServicesInvolved,
-        policeReport: matter.policeReport,
-        insuranceInformation: matter.insuranceInformation,
-        otherPartyInformation: matter.otherPartyInformation,
-        witnesses: matter.witnesses,
-        lostWages: matter.lostWages,
-        representedByAttorney: matter.representedByAttorney,
+        serviceRequested: matter.incidentType,
+        preferredDate: matter.incidentDate?.toISOString().slice(0, 10) ?? null,
+        bookingNotes: matter.incidentDescription,
+        stylistPreference: matter.otherPartyInformation,
       });
       return {
         matterId: matter.id,
