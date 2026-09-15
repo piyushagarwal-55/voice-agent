@@ -1,5 +1,4 @@
 import { fileURLToPath } from "node:url";
-import { createServer } from "node:http";
 import { AgentSession, AgentSessionEventTypes, ServerOptions, cli, defineAgent, type JobContext } from "@livekit/agents";
 import * as openai from "@livekit/agents-plugin-openai";
 import * as sarvam from "@livekit/agents-plugin-sarvam";
@@ -10,20 +9,6 @@ import { CallLogService } from "./services/CallLogService.js";
 import { CallOrchestrator } from "./orchestrator/CallOrchestrator.js";
 
 const logger = createLogger("agent:entry");
-
-const healthPort = Number(process.env.PORT ?? 10000);
-createServer((req, res) => {
-  if (req.url === "/health") {
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ status: "ok" }));
-    return;
-  }
-
-  res.writeHead(404);
-  res.end();
-}).listen(healthPort, "0.0.0.0", () => {
-  logger.info("health server listening", { port: healthPort });
-});
 
 /** Upper bound on how long teardown waits for the agent's closing line to finish. */
 const GOODBYE_MAX_WAIT_MS = 15_000;
