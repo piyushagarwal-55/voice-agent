@@ -7,52 +7,20 @@ import { z } from "zod";
  * All fields are optional/nullable because intake is collected incrementally
  * across many turns — a partial update should never fail validation.
  */
-export const incidentTypeEnum = z.enum([
-  "motor_vehicle_accident",
-  "slip_and_fall",
-  "workplace_injury",
-  "medical_malpractice",
-  "product_liability",
-  "dog_bite",
-  "other",
-]);
-export type IncidentType = z.infer<typeof incidentTypeEnum>;
-
-export const SUPPORTED_INCIDENT_TYPES: IncidentType[] = [
-  "motor_vehicle_accident",
-  "slip_and_fall",
-  "workplace_injury",
-  "dog_bite",
-];
-
 export const intakeFieldsSchema = z.object({
-  incidentType: incidentTypeEnum.nullable().optional(),
-  incidentDate: z
-    .string()
-    .describe("ISO date (YYYY-MM-DD) if the caller gave or implied a specific date, else null")
-    .nullable()
-    .optional(),
-  incidentLocation: z.string().nullable().optional(),
-  incidentDescription: z.string().nullable().optional(),
-  injuries: z.array(z.string()).optional(),
-  treatmentReceived: z.string().nullable().optional(),
-  emergencyServicesInvolved: z.boolean().nullable().optional(),
-  policeReport: z.boolean().nullable().optional(),
-  insuranceInformation: z.string().nullable().optional(),
-  otherPartyInformation: z.string().nullable().optional(),
-  witnesses: z.string().nullable().optional(),
-  lostWages: z.boolean().nullable().optional(),
-  representedByAttorney: z.boolean().nullable().optional(),
+  serviceRequested: z.string().nullable().optional(),
+  preferredDate: z.string().describe("Preferred appointment date, preferably ISO YYYY-MM-DD").nullable().optional(),
+  preferredTime: z.string().nullable().optional(),
+  stylistPreference: z.string().nullable().optional(),
+  bookingNotes: z.string().nullable().optional(),
 });
 
 export type IntakeFields = z.infer<typeof intakeFieldsSchema>;
 
 export const REQUIRED_INTAKE_FIELDS: (keyof IntakeFields)[] = [
-  "incidentType",
-  "incidentDate",
-  "incidentLocation",
-  "incidentDescription",
-  "injuries",
+  "serviceRequested",
+  "preferredDate",
+  "preferredTime",
 ];
 
 export const callerContactSchema = z.object({
@@ -72,10 +40,9 @@ export const QualificationStatus = {
 export type QualificationStatus = (typeof QualificationStatus)[keyof typeof QualificationStatus];
 
 export interface QualificationInput {
-  incidentType: IncidentType | null | undefined;
-  incidentDate: string | null | undefined;
-  injuries: string[] | undefined;
-  representedByAttorney: boolean | null | undefined;
+  serviceRequested: string | null | undefined;
+  preferredDate: string | null | undefined;
+  preferredTime: string | null | undefined;
 }
 
 export interface QualificationResult {
@@ -91,20 +58,11 @@ export interface QualificationResult {
 export function evaluateQualification(input: QualificationInput): QualificationResult {
   const reasons: string[] = [];
 
-  const hasInjury = (input.injuries?.length ?? 0) > 0;
-  if (!hasInjury) reasons.push("no_injury_reported");
+  if (!input.serviceRequested) reasons.push("service_not_selected");
+  if (!input.preferredDate) reasons.push("preferred_date_unknown");
+  if (!input.preferredTime) reasons.push("preferred_time_unknown");
 
-  const supportedType = input.incidentType != null && SUPPORTED_INCIDENT_TYPES.includes(input.incidentType);
-  if (!supportedType) reasons.push("incident_type_not_supported");
-
-  const dateKnown = Boolean(input.incidentDate);
-  if (!dateKnown) reasons.push("incident_date_unknown");
-
-  if (input.representedByAttorney === true) {
-    return { status: QualificationStatus.DISQUALIFIED, reasons: ["already_represented_by_attorney"] };
-  }
-
-  if (hasInjury && supportedType && dateKnown) {
+  if (reasons.length === 0) {
     return { status: QualificationStatus.QUALIFIED, reasons: [] };
   }
 

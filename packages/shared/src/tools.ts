@@ -16,9 +16,9 @@ export const getCallerOutputSchema = z.object({
   callerId: z.string().nullable(),
   name: z.string().nullable(),
   email: z.string().nullable(),
-  /** Most recent still-open matter, so a returning caller resumes it instead of opening a duplicate. */
+  /** Most recent still-open booking, so a returning caller resumes it instead of opening a duplicate. */
   existingMatter: z
-    .object({ matterId: z.string(), incidentType: z.string().nullable(), status: z.string() })
+    .object({ matterId: z.string(), serviceRequested: z.string().nullable(), status: z.string() })
     .nullable(),
 });
 
@@ -48,7 +48,7 @@ export const createCallerOutputSchema = z.object({
 
 export const createMatterInputSchema = z.object({
   callerId: z.string(),
-  matterType: z.string(),
+  serviceRequested: z.string(),
 });
 export const createMatterOutputSchema = z.object({
   matterId: z.string(),
